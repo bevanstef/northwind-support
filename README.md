@@ -119,20 +119,3 @@ and 40 tickets across every status, priority and SLA state.
 | 4 | Dockerise the API | ... |
 | Docs | README, APPROACH.md & review | ... |
 | **Total** | | **...** |
-
-
-## 1.1 Defect Fix (DEFECT-117)
-
-### Root Cause
-In `apps/web/src/features/tickets/hooks/useTicketList.ts`, the `useEffect` hook's dependency array only included `[filters.search, filters.page, filters.pageSize]`. When changing dropdown filters (`status`, `priority`, `categoryId`, etc.), React state was updated, but the fetch effect was never triggered. When the user subsequently typed into the search box, `filters.search` changed and triggered the effect, sending the accumulated, stale filter state.
-
-### Fix
-1. Compared previous and current filters using a `useRef` to detect exactly what changed.
-2. If only `search` changes, debounced the request by 300 ms to prevent per-keystroke API calls.
-3. If any non-search filter changes (e.g. `status`, `priority`, or future filters like `slaStatus`), cancelled any pending search timer and dispatched an **immediate** request.
-4. Used dynamic key comparison so that adding new filter fields (such as Task 2's `slaStatus`) triggers immediate requests without needing manual wiring in the hook.
-5. Added an `activeRequestIdRef` counter to ignore out-of-order responses from stale network requests.
-
-### How to Verify
-- **Automated test:** Run `npm run test --workspace apps/web` (see `useTicketList.test.ts: triggers an immediate request when status changes (DEFECT-117)`).
-- **Manual verification:** Open `http://localhost:5173`, change the Status dropdown to *In progress*, and inspect the Network tab: a request to `/api/tickets` is sent immediately.

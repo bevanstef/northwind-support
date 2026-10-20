@@ -16,22 +16,19 @@ namespace SupportDesk.Infrastructure.Queries;
 /// </summary>
 public sealed class TicketQueries(SupportDbContext db, IClock clock) : ITicketQueries
 {
-    /// <remarks>
-    /// Sorts and pages every ticket. The filter values bound into <paramref name="query"/>
-    /// (search, status, priority, category, customer, agent, unassigned-only) are not applied
-    /// yet: server-side filtering is still to be built.
-    /// </remarks>
     public async Task<PagedResult<TicketListItemDto>> GetPagedAsync(TicketQuery query, CancellationToken ct)
     {
-        var tickets = TicketsWithLabels();
+        var normalizedQuery = query.Normalized();
+
+        var tickets = ApplyFilters(TicketsWithLabels(), normalizedQuery);
 
         var totalCount = await tickets.CountAsync(ct);
 
         var now = clock.UtcNow;
 
-        var items = await ApplySort(tickets, query)
-            .Skip((query.Page - 1) * query.PageSize)
-            .Take(query.PageSize)
+        var items = await ApplySort(tickets, normalizedQuery)
+            .Skip((normalizedQuery.Page - 1) * normalizedQuery.PageSize)
+            .Take(normalizedQuery.PageSize)
             .Select(x => new TicketListItemDto
             {
                 Id = x.Ticket.Id,
@@ -50,7 +47,7 @@ public sealed class TicketQueries(SupportDbContext db, IClock clock) : ITicketQu
             })
             .ToListAsync(ct);
 
-        return new PagedResult<TicketListItemDto>(items, query.Page, query.PageSize, totalCount);
+        return new PagedResult<TicketListItemDto>(items, normalizedQuery.Page, normalizedQuery.PageSize, totalCount);
     }
 
     public Task<TicketDetailDto?> GetDetailAsync(int id, CancellationToken ct)
@@ -142,6 +139,50 @@ public sealed class TicketQueries(SupportDbContext db, IClock clock) : ITicketQu
 
         // Keeps paging stable when the sort column has duplicates.
         return sorted.ThenByDescending(x => x.Ticket.Id);
+    }
+
+    private static IQueryable<TicketWithLabels> ApplyFilters(IQueryable<TicketWithLabels> source, TicketQuery query)
+    {
+        if (query.Status.HasValue)
+        {
+            source = source.Where(x => x.Ticket.Status == query.Status.Value);
+        }
+
+        if (query.Priority.HasValue)
+        {
+            source = source.Where(x => x.Ticket.Priority == query.Priority.Value);
+        }
+
+        if (query.CategoryId.HasValue)
+        {
+            source = source.Where(x => x.Ticket.CategoryId == query.CategoryId.Value);
+        }
+
+        if (query.CustomerId.HasValue)
+        {
+            source = source.Where(x => x.Ticket.CustomerId == query.CustomerId.Value);
+        }
+
+        if (query.AssignedAgentId.HasValue)
+        {
+            source = source.Where(x => x.Ticket.AssignedAgentId == query.AssignedAgentId.Value);
+        }
+
+        if (query.UnassignedOnly)
+        {
+            source = source.Where(x => x.Ticket.AssignedAgentId == null);
+        }
+
+        if (!string.IsNullOrWhiteSpace(query.Search))
+        {
+            var term = query.Search.Trim();
+            source = source.Where(x =>
+                x.Ticket.Title.Contains(term) ||
+                x.Ticket.Reference.Contains(term) ||
+                x.Customer.Name.Contains(term));
+        }
+
+        return source;
     }
 
     private sealed class TicketWithLabels
