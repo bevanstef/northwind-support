@@ -51,4 +51,27 @@ describe('useTicketList', () => {
     expect(result.current.isLoading).toBe(false);
     expect(result.current.data?.items).toHaveLength(1);
   });
+
+  it('triggers an immediate request when status changes (DEFECT-117)', async () => {
+    const { result } = renderHook(() => useTicketList());
+
+    // Allow the initial mount effect to complete
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+
+    expect(getTickets).toHaveBeenCalledTimes(1);
+
+    // Act: change status
+    act(() => {
+      result.current.updateFilters({ status: 'InProgress' });
+    });
+
+    // Assert: request must be sent immediately without waiting for debounce
+    expect(getTickets).toHaveBeenCalledTimes(2);
+    expect(getTickets).toHaveBeenLastCalledWith(
+      expect.objectContaining({ status: 'InProgress', page: 1 }),
+    );
+  });
+
 });
