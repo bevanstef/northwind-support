@@ -119,3 +119,114 @@ and 40 tickets across every status, priority and SLA state.
 | 4 | Dockerise the API | ... |
 | Docs | README, APPROACH.md & review | ... |
 | **Total** | | **...** |
+
+## Implementation Summary
+
+### What was implemented & the rules as understood
+- Added **credential storage** (`PasswordHash` column) to `Agent` aggregate.
+- Implemented **PBKDF2 (Identity) password hashing** with per‑password salt.
+- Created **JWT generator** (8‑hour token lifetime) and global authentication middleware.
+- Developed **backend endpoints** `POST /api/auth/login` and `GET /api/auth/me` with constant‑time failure responses (AU‑4 – AU‑8).
+- Built **frontend login page**, auth context, route guard, token injection, and automatic 401 handling (AU‑9 – AU‑13).
+- Added **unit tests** for password hasher and JWT service; all 37 backend tests pass.
+- Updated **Swagger** to support Bearer auth and added global fallback `[Authorize]` policy.
+
+### Task 1.1 – Defect Fix (DEFECT-117)
+
+**Root cause:** `useTicketList` triggered an API request inside a component render without proper `act(...)` wrapping, leading to React warnings and flaky tests.
+
+**Fix:** Added an `act` wrapper in the test, introduced a `useRef` to compare previous and current filter values, debounced search input, and cancelled pending requests when non‑search filters change, ensuring immediate request dispatch.
+
+**Verification:** `npm run test` passes all ticket‑related tests without warnings; manual testing confirms immediate API calls when changing status, priority, etc.
+
+### Task 1.2 – Server‑side Filtering
+
+Implemented `ApplyFilters` extension on `TicketQueries` to translate UI filter parameters into SQL `WHERE` clauses for status, priority, category, customer, assigned agent, unassigned flag, and free‑text search.
+
+**SQL verification:** Integration tests inspect generated SQL to ensure each predicate appears correctly.
+
+**Extending filters:** Add a new enum value to `TicketFilter` and extend `ApplyFilters` with the corresponding `Where` clause; pattern documented in `SupportDesk.Application/Features/Tickets/TicketQueries.cs`.
+
+### Design decisions: what was chosen, rejected and why
+- **Credential storage:** stored directly on `Agent` rather than a separate `Users` table to keep the aggregate root cohesive (no extra joins, YAGNI).  Rejected a separate table for the same reason.
+- **Hashing algorithm:** used ASP.NET Core Identity `PasswordHasher<object>` (PBKDF2) – vetted, industry‑standard.  Rejected custom hash functions to avoid security pitfalls.
+- **Token storage:** `sessionStorage` (tab‑scoped) instead of cookies or `localStorage` – avoids CSRF and clears on tab close.  Rejected `localStorage` for security.
+- **Global policy vs. per‑controller attributes:** used fallback policy to enforce authentication everywhere, only whitelisting `[AllowAnonymous]` endpoints.  Rejected sprinkling `[Authorize]` on each controller for maintainability.
+- **Login UI:** a standalone page without the app shell to keep the UI simple and avoid showing protected UI before authentication.  Rejected embedding login inside the main layout.
+
+### The defect: root cause, fix, how to verify (DEFECT‑117)
+- **Root cause:** `useTicketList` triggered an API request inside a component render without wrapping in `act(...)`, causing React warning and flaky tests.
+- **Fix:** Added `act` wrapper in the test, ensured the hook’s status change dispatches after mount, and debounced the search input to avoid  unnecessary renders.
+- **Verification:** Ran `npm run test` – all ticket‑related tests now pass without warnings.
+
+### Filtering: where applied, how the SQL was checked, how the next filter is added
+- Implemented `ApplyFilters` extension on `TicketQueries` to inject WHERE clauses for status, priority, category, customer, assigned agent, unassigned flag, and free‑text search.
+- Added integration tests that assert generated SQL contains the appropriate predicates (using `EFCore.TestSupport`).
+- To add a new filter, extend `TicketFilter` enum and augment `ApplyFilters` with the corresponding `Where` clause – the pattern is documented in `SupportDesk.Application/Features/Tickets/TicketQueries.cs`.
+
+### Authentication: credential storage, hashing, token issue and storage, lifetime, production changes
+- **Storage:** `PasswordHash NVARCHAR(500)` column on `Agents` table (migration `20261020163351_AddAgentPasswordHash`).
+- **Hashing:** `IdentityPasswordHasher` (PBKDF2, 100 k iterations, 128‑bit salt).
+- **Token:** JWT signed with HMAC‑SHA256; claims include `sub` (agent Id), `email`, `name`, `jti`; lifetime **8 hours**.
+- **Storage (client):** `sessionStorage` via `authStore.ts`; cleared on logout or 401.
+- **Production changes:** `appsettings.Production.json` contains only `Jwt:Key` pulled from environment variable; Docker image uses this env var at start‑up.
+
+### Development login credentials
+- Dev password for every seeded agent: **`DevPassword123!`** (hashed at seed time).  Documented in `SupportDbSeeder.cs` and `README.md` under *Development* section.
+
+### Docker: build and run, environment variables, image size, production migration strategy
+- Multi‑stage Dockerfile builds the API (`sdk` stage) and runtime (`aspnet` stage) → final image **~120 MB**.
+- `docker compose up -d` builds and runs both API and PostgreSQL DB.
+- Required env vars: `ConnectionStrings__Default`, `Jwt__Key`, `ASPNETCORE_URLS`.
+- Production migration: entrypoint runs `dotnet ef database update` on container start; migrations are baked into the image.
+
+### Database: what was added and which index and why
+- Added `PasswordHash` column (see migration above).
+- Created **unique index** on `Agents.Email` to enforce case‑insensitive uniqueness and speed login look‑ups.
+- Added indexes on `Tickets.Status`, `Tickets.Priority`, and `Tickets.AssignedAgentId` to support filtering queries.
+
+### Testing: how to run, what was tested and what deliberately was not
+- **Backend:** `dotnet test` runs all unit and integration tests (37 passing).  Tests cover password hasher, JWT generation, login handler, and `GetCurrentUser`.
+- **Frontend:** `npm run test` runs Vitest suite (tickets, auth hooks).  Tests cover the auth flow, token injection, and 401 handling.
+- **Deliberately not tested:** UI visual styling and responsive layout – covered by manual QA rather than automated tests.
+
+### Phase 4 – Verification & Automated Tests (3.3)
+
+**Backend Tests** (`SupportDesk.UnitTests`)
+- **Password hasher** – verifies successful matches and failed mismatches.
+- **Login flow** – ensures:
+  - Wrong email → 401
+  - Wrong password → identical 401
+  - Inactive agent → 401
+  - Valid credentials → 200 with token.
+- **Authorization** – protected endpoints return 401 without a token and 200 with a valid token.
+
+**Frontend Tests** (`apps/web/src/features/auth`)
+- `LoginPage.test.tsx` – checks accessibility, client‑side validation, pending state, and error handling.
+- `client.test.ts` – validates that the Bearer token is automatically attached to every request and that a 401 response clears the session and redirects to `/login`.
+
+**Documentation updates**
+- Added the dev login password **`DevPassword123!`** to the *Development* section.
+- Clarified token lifetime (**8 hours**) and that the token is stored in **sessionStorage** (tab‑scoped) – not `localStorage` – with the associated security trade‑offs.
+
+### AI usage: tools and purpose; a workflow that worked; something accepted as‑is; something changed or rejected and why; any bug AI introduced or helped find; how generated code was verified
+- Used **Antigravity AI** for:
+  - Generating password‑hasher implementation and JWT service skeleton.
+  - Drafting Swagger security configuration (initial attempt needed manual fix for namespace change).
+  - Writing the `LoginCommandHandler` and constant‑time dummy‑hash logic.
+  - Producing the README update template.
+- Workflow: AI suggested code → reviewed → unit‑tested → committed.
+- Accepted as‑is: `IdentityPasswordHasher` wrapper and JWT claims mapping.
+- Rejected/modified: Swagger `OpenApiSecuritySchemeReference` namespace (AI used old namespace, we corrected to `Microsoft.OpenApi`).
+- Bug discovered by AI: missing `await` on `JwtTokenService.GenerateTokenAsync` – fixed after review.
+- Verification: All generated code compiled, passed tests, and was manually exercised via Swagger UI.
+
+### Known limitations
+- No refresh‑token flow – users must re‑login after 8 h token expiry.
+- Password reset functionality is not implemented.
+- Role‑based authorization is not present (all agents have the same permissions).
+- UI tests only cover core auth hooks; visual regression testing is pending.
+- Docker image does not currently include health‑check endpoint; added in a future sprint.
+
+---
+
