@@ -114,8 +114,8 @@ and 40 tickets across every status, priority and SLA state.
 | --- | --- | --- |
 | 1.1 | Defect Fix (DEFECT-117) & regression test | 1 hour |
 | 1.2 | Server-side filtering (FL-1 to FL-6) & tests | 2 hours |
-| 2 | Ticket Escalation & Assignment | ... | started time 8.56 pm on 20/10/2026 |
-| 3 | Login and authentication | ... |
+| 2 | Ticket Escalation & Assignment | ... |
+| 3 | Login and authentication | 5 hours |
 | 4 | Dockerise the API | ... |
 | Docs | README, APPROACH.md & review | ... |
 | **Total** | | **...** |
