@@ -76,11 +76,111 @@ a {
   font-weight: 600;
 }
 
+/* AU-13: Push the user info to the far right of the header. */
+.app__user {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.app__user-name {
+  font-size: 0.9rem;
+  color: var(--colour-muted);
+}
+
+.app__logout {
+  font-size: 0.85rem;
+  padding: 5px 10px;
+}
+
 .app__main {
   max-width: 1200px;
   margin: 0 auto;
   padding: 24px;
 }
+
+/* ── Login page ─────────────────────────────────────────────────────────────── */
+
+.login-page {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--colour-page);
+  padding: 24px;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 400px;
+  background: var(--colour-surface);
+  border: 1px solid var(--colour-border);
+  border-radius: 12px;
+  padding: 40px 36px 32px;
+  box-shadow: 0 4px 24px 0 rgba(0, 0, 0, 0.06);
+}
+
+.login-card__brand {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.login-card__logo {
+  font-size: 2rem;
+  display: block;
+  margin-bottom: 8px;
+}
+
+.login-card__title {
+  font-size: 1.4rem;
+  margin: 0 0 4px;
+}
+
+.login-card__subtitle {
+  margin: 0;
+  color: var(--colour-muted);
+  font-size: 0.9rem;
+}
+
+.login-card__form {
+  display: flex;
+  flex-direction: column;
+}
+
+.login-card__form .field {
+  min-width: unset;
+  flex: none;
+}
+
+.login-card__form input {
+  width: 100%;
+}
+
+.login-card__error {
+  margin: 0 0 16px;
+  padding: 10px 14px;
+  border-radius: 6px;
+  background: var(--colour-danger-bg);
+  color: var(--colour-danger-text);
+  font-size: 0.9rem;
+}
+
+.login-card__submit {
+  width: 100%;
+  padding: 10px;
+  margin-top: 8px;
+  font-size: 1rem;
+}
+
+.login-card__hint {
+  margin: 20px 0 0;
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--colour-muted);
+}
+
+
 
 .page-header {
   display: flex;

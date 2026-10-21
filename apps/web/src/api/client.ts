@@ -1,4 +1,5 @@
 import type { ProblemDetails } from '../types/api';
+import { authStore } from '../lib/authStore';
 
 /**
  * Where the API lives. In development this stays '/api' and the Vite dev server proxies it
@@ -26,17 +27,29 @@ export class ApiError extends Error {
 }
 
 /**
- * The single place that talks to the API. Returns parsed JSON, or throws an
- * {@link ApiError} that callers can show to the user.
+ * The single place that talks to the API. Attaches the stored JWT as an
+ * Authorization header on every call (AU-11) and redirects to /login on a
+ * 401 so an expired session is handled automatically (AU-13).
  */
 export async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const token = authStore.getToken();
+
   const response = await fetch(`${baseUrl}${path}`, {
     ...init,
     headers: {
       'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(init?.headers ?? {}),
     },
   });
+
+  if (response.status === 401) {
+    // Clear stale credentials and let the router guard send the user to /login.
+    authStore.clear();
+    window.location.replace('/login');
+    // Throw so the caller's .catch() can bail out cleanly.
+    throw new ApiError(401, 'Session expired. Please log in again.');
+  }
 
   if (!response.ok) {
     const problem = await readProblem(response);
