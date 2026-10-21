@@ -41,6 +41,12 @@ public static class DependencyInjection
         services.AddScoped<IAgentQueries, AgentQueries>();
         services.AddScoped<ICategoryQueries, CategoryQueries>();
 
+        services.Configure<Configuration.JwtOptions>(
+            configuration.GetSection(Configuration.JwtOptions.SectionName));
+
+        services.AddSingleton<IPasswordHasher, IdentityPasswordHasher>();
+        services.AddSingleton<IJwtTokenGenerator, JwtTokenService>();
+
         services.AddScoped<SupportDbSeeder>();
 
         return services;
