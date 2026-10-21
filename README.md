@@ -112,12 +112,10 @@ and 40 tickets across every status, priority and SLA state.
 
 | Task | Description | Time Spent |
 | --- | --- | --- |
-| 1.1 | Defect Fix (DEFECT-117) & regression test | 1 hour |
-| 1.2 | Server-side filtering (FL-1 to FL-6) & tests | 2 hours |
-| 2 | Ticket Escalation & Assignment | ... |
+| 1 | Fix a defect, add server-side filtering | 5 hours |
+| 2 | Ticket Escalation & Assignment | not finished |
 | 3 | Login and authentication | 5 hours |
-| 4 | Dockerise the API | ... |
-| Docs | README, APPROACH.md & review | ... |
+| 4 | Dockerise the API | not finished | |
 | **Total** | | **...** |
 
 ## Implementation Summary
@@ -230,3 +228,14 @@ Implemented `ApplyFilters` extension on `TicketQueries` to translate UI filter p
 
 ---
 
+### Why Tasks 2 and 4 are not finished
+
+I did not complete Task 2 or Task 4. I was new to C#, SQL Server and React, and I
+lost time on setup (Docker needed WSL and the Virtual Machine Platform feature
+enabled before it would install). I preferred to understand the work I submitted
+rather than rush code I couldn't explain.
+
+For Task 2, I read the business rules (BR-1 to BR-8) and understand what they ask,
+but I did not implement them. My plan would have been small separate classes for
+priority, SLA window, agent selection and SLA status, shared by create and
+escalate. Nothing for Task 4 was started.
